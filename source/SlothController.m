@@ -19,8 +19,10 @@
  */
 
 #import "SlothController.h"
+#import "NSBag.h"
 
 @implementation SlothController
+@synthesize activeInstances, activeDictionary, activeSet;
 
 - (id)init
 {
@@ -35,7 +37,7 @@
 { 
 	NSDictionary *registrationDefaults = [NSDictionary dictionaryWithContentsOfFile: 
 										  [[NSBundle mainBundle] pathForResource: @"RegistrationDefaults" ofType: @"plist"]];
-    [[NSUserDefaults standardUserDefaults] registerDefaults: registrationDefaults];
+    [NSUserDefaults.standardUserDefaults registerDefaults: registrationDefaults];
 }
 
 - (void)awakeFromNib
@@ -44,11 +46,11 @@
 	NSSortDescriptor *nameSortDescriptor = [[NSSortDescriptor alloc] initWithKey:@"name"
 																	   ascending: YES selector:@selector(localizedCaseInsensitiveCompare:)];
 	
-	[tableView setSortDescriptors: [NSArray arrayWithObject: nameSortDescriptor]];
+	[tableView setSortDescriptors: @[nameSortDescriptor]];
 	
 	// dragging from tableview
 	[tableView setDraggingSourceOperationMask:NSDragOperationEvery forLocal:NO];
-	[tableView registerForDraggedTypes:[NSArray arrayWithObjects: NSStringPboardType, nil]];
+	[tableView registerForDraggedTypes:@[NSStringPboardType]];
 	
 	// center and show window
 	[slothWindow center];
@@ -75,21 +77,16 @@
 
 - (IBAction)refresh:(id)sender
 {
-	NSPipe			*pipe		= [NSPipe pipe];
-	NSData			*data;
-	int				i;
-	BOOL			isDir		= FALSE;
-	NSString		*pid		= @"";
-	NSString		*process	= @"";
-	NSString		*ftype		= @"";
-	NSString		*fname		= @"";
-	
-	NSString		*output		= @"";
-	NSArray			*lines;
-	
+	NSArray		*lines;
+	NSData		*data;
+	NSString	*pid, *process, *ftype, *fname, *output = nil;
+	NSPipe 		*pipe 	= NSPipe.pipe;
+	BOOL 		isDir	= FALSE;
+	int	i;
+
 	//first, make sure that we have a decent lsof
-	NSString *launchPath = [[NSUserDefaults standardUserDefaults] stringForKey:@"lsofPath"];
-	if (![[NSFileManager defaultManager] fileExistsAtPath: launchPath isDirectory: &isDir] || isDir)
+	NSString *launchPath = [NSUserDefaults.standardUserDefaults stringForKey:@"lsofPath"];
+	if (![NSFileManager.defaultManager fileExistsAtPath: launchPath isDirectory: &isDir] || isDir)
 	{
 		[STUtil alert: @"Invalid executable" subText: @"The 'lsof' utility you specified in the Preferences does not exist"];
 		return;
@@ -102,14 +99,19 @@
 	[progressBar setUsesThreadedAnimation: TRUE];
 	[progressBar startAnimation: self];
 	
-	//
+	NSBlockOperation* theOp = [NSBlockOperation blockOperationWithBlock: ^{
+		NSLog(@"Beginning operation.\n");
+		// Do some work.
+	}];
+
+
 	// our command is:			lsof -F pcnt +c0
 	//
 	// OK, initialise task, run it, retrieve output
 	{
 		NSTask *lsof = [[NSTask alloc] init];
 		[lsof setLaunchPath: launchPath];
-		[lsof setArguments: [NSArray arrayWithObjects: @"-F", @"pcnt", @"+c0", nil]];
+		[lsof setArguments: @[@"-F", @"pcnt", @"+c0"]];
 		[lsof setStandardOutput: pipe];
 		[lsof launch];
 		
@@ -125,7 +127,7 @@
 	// parse each line
 	for (i = 0; i < [lines count]-1; i++)
 	{
-		NSString *line = [lines objectAtIndex: i];
+		NSString *line = lines[i];
 		
 		//read first character in line
 		if ([line characterAtIndex: 0] == 'p')
@@ -149,7 +151,7 @@
 			//check if we use full path
             NSString *rawPath = [line substringFromIndex: 1];            
             BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath: rawPath];
-            NSNumber *canReveal = [NSNumber numberWithBool: fileExists];
+            NSNumber *canReveal = @(fileExists);
             NSString *fullPath = rawPath;
             
 			if (fileExists)
@@ -160,32 +162,32 @@
             //order matters, see below
             NSMutableDictionary *fileInfo = [NSMutableDictionary dictionary];
 			
-            [fileInfo setObject: process forKey: @"name"];
-            [fileInfo setObject: [NSNumber numberWithLong: [pid intValue]] forKey: @"pid"];
-            [fileInfo setObject: fname forKey: @"path"];
-            [fileInfo setObject: fullPath forKey: @"fullPath"];
-            [fileInfo setObject: canReveal forKey: @"canReveal"];
+            fileInfo[@"name"] = process;
+            fileInfo[@"pid"] = @([pid intValue]);
+            fileInfo[@"path"] = fname;
+            fileInfo[@"fullPath"] = fullPath;
+            fileInfo[@"canReveal"] = canReveal;
 			
 			//insert the desired elements
 			if ([ftype caseInsensitiveCompare: @"VREG"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"REG"] == NSOrderedSame) 
 			{
-				[fileInfo setObject: @"File" forKey: @"type"];
+				fileInfo[@"type"] = @"File";
 			} 
 			else if ([ftype caseInsensitiveCompare: @"VDIR"] == NSOrderedSame  || [ftype caseInsensitiveCompare: @"DIR"] == NSOrderedSame) 
 			{
-				[fileInfo setObject: @"Directory" forKey: @"type"];
+				fileInfo[@"type"] = @"Directory";
             } 
 			else if ([ftype caseInsensitiveCompare: @"IPv6"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"IPv4"] == NSOrderedSame) 
 			{
-                [fileInfo setObject: @"IP Socket" forKey: @"type"];
+                fileInfo[@"type"] = @"IP Socket";
             } 
 			else  if ([ftype caseInsensitiveCompare: @"unix"] == NSOrderedSame) 
 			{
-                [fileInfo setObject: @"Unix Socket" forKey: @"type"];
+                fileInfo[@"type"] = @"Unix Socket";
             } 
 			else if ([ftype caseInsensitiveCompare: @"VCHR"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"CHR"] == NSOrderedSame) 
 			{
-                [fileInfo setObject: @"Char Device" forKey: @"type"];
+                fileInfo[@"type"] = @"Char Device";
             }
 			else
 			{
@@ -195,17 +197,30 @@
 		}
 	}
 	
-	activeSet = fileArray;
-	[self filterResults];
-	
-	// update last run time
-	[lastRunTextField setStringValue: [NSString stringWithFormat: @"Output at %@ ", [NSDate date]]];
-	
-	// stop progress bar and reload data
-	[tableView reloadData];
-	[progressBar stopAnimation: self];
 }
 
+- (void) setActiveSet:(NSMutableArray *)aS {
+
+	activeSet = aS;		if (!aS) return;
+	activeDictionary 	= NSMutableDictionary.new;
+	activeInstances 	= NSMutableDictionary.new;
+	[activeSet enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+		NSString* group = obj[@"name"];
+		if ( activeDictionary[group] )   [activeDictionary[group] addObject:obj];
+		else [activeDictionary setValue:[NSMutableArray arrayWithObject:obj]
+								 forKey:group];
+	}];
+	[activeDictionary.allKeys enumerateObjectsUsingBlock:^(NSString* name, NSUInteger idx, BOOL *stop) {
+		__block NSBag *bag = NSBag.new;
+		[activeDictionary[name] enumerateObjectsUsingBlock:^(NSDictionary *d, NSUInteger idx, BOOL *stop) {
+			[bag add:d[@"pid"]];
+		}];
+		[activeInstances setValue:@([bag objects].count) forKey:name];
+	}];
+//	[activeDictionary writeToFile:@"/Users/localadmin/Desktop/dictionary.plist" atomically: YES];
+
+	[tableView reloadData];
+}
 
 // creates a subset of the list of files based on our filtering criterion
 - (void)filterResults
@@ -215,7 +230,7 @@
 	
 	if (subset != NULL)
 		[subset release];
-	
+
 	subset = [[NSMutableArray alloc] init];
 	
 	NSString *regex = [[NSString alloc] initWithString: [filterTextField stringValue]];
@@ -225,29 +240,29 @@
 		BOOL filtered = NO;
 		
 		// let's see if it gets filtered by the checkboxes
-		if ([[object objectForKey:@"type"] isEqualToString: @"File"] && ![[NSUserDefaults standardUserDefaults] boolForKey: @"showRegularFilesEnabled"])
+		if ([object[@"type"] isEqualToString: @"File"] && ![NSUserDefaults.standardUserDefaults boolForKey: @"showRegularFilesEnabled"])
 			filtered = YES;
-		if ([[object objectForKey:@"type"] isEqualToString: @"Directory"] && ![[NSUserDefaults standardUserDefaults] boolForKey: @"showDirectoriesEnabled"])
+		if ([object[@"type"] isEqualToString: @"Directory"] && ![NSUserDefaults.standardUserDefaults boolForKey: @"showDirectoriesEnabled"])
 			filtered = YES;
-		if ([[object objectForKey:@"type"] isEqualToString: @"IP Socket"] && ![[NSUserDefaults standardUserDefaults] boolForKey: @"showIPSocketsEnabled"])
+		if ([object[@"type"] isEqualToString: @"IP Socket"] && ![NSUserDefaults.standardUserDefaults boolForKey: @"showIPSocketsEnabled"])
 			filtered = YES;
-		if ([[object objectForKey:@"type"] isEqualToString: @"Unix Socket"] && ![[NSUserDefaults standardUserDefaults] boolForKey: @"showUnixSocketsEnabled"])
+		if ([object[@"type"] isEqualToString: @"Unix Socket"] && ![NSUserDefaults.standardUserDefaults boolForKey: @"showUnixSocketsEnabled"])
 			filtered = YES;
-		if ([[object objectForKey:@"type"] isEqualToString: @"Char Device"] && ![[NSUserDefaults standardUserDefaults] boolForKey: @"showCharacterDevicesEnabled"])
+		if ([object[@"type"] isEqualToString: @"Char Device"] && ![NSUserDefaults.standardUserDefaults boolForKey: @"showCharacterDevicesEnabled"])
 			filtered = YES;
 		
 		// see if regex in search field filters it out
 		if (!filtered && [[filterTextField stringValue] length] > 0)
 		{
-			if ([[object objectForKey:@"name"] isMatchedByRegex: regex] == YES) 
+			if ([object[@"name"] isMatchedByRegex: regex] == YES) 
 				[subset addObject:object];
-			else if ([[[object objectForKey:@"pid"] stringValue] isMatchedByRegex: regex] == YES) 
+			else if ([[object[@"pid"] stringValue] isMatchedByRegex: regex] == YES) 
 				[subset addObject:object];
-			else if ([[object objectForKey:@"path"] isMatchedByRegex: regex] == YES) 
+			else if ([object[@"path"] isMatchedByRegex: regex] == YES) 
 				[subset addObject:object];
-			else if ([[object objectForKey:@"fullPath"] isMatchedByRegex: regex] == YES) 
+			else if ([object[@"fullPath"] isMatchedByRegex: regex] == YES) 
 				[subset addObject:object];
-			else if ([[object objectForKey:@"type"] isMatchedByRegex: regex] == YES) 
+			else if ([object[@"type"] isMatchedByRegex: regex] == YES) 
 				[subset addObject:object];
 		}
 		else if (!filtered)
@@ -256,7 +271,7 @@
 	
 	[regex release];
 	
-	activeSet = subset;
+	self.activeSet = subset;
 	
 	/*	NSSortDescriptor *nameSortDescriptor = [[NSSortDescriptor alloc] initWithKey:@"name"
 	 ascending: YES selector:@selector(localizedCaseInsensitiveCompare:)];
@@ -266,7 +281,7 @@
 	
 	//activeSet = [subset sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
 	
-	[numItemsTextField setStringValue: [NSString stringWithFormat: @"%d items", [activeSet count]]];
+	[numItemsTextField setStringValue: [NSString stringWithFormat: @"%ld items", (unsigned long)[activeSet count]]];
 }
 
 
@@ -293,11 +308,9 @@
 	{
 		if ([selectedRows containsIndex: i])
 		{
-			[processesToTerminateNamed setObject: [[activeSet objectAtIndex: i] objectForKey: @"name"] 
-										  forKey: [[activeSet objectAtIndex: i] objectForKey: @"name"]];
+			processesToTerminateNamed[activeSet[i][@"name"]] = activeSet[i][@"name"];
 			
-			[processesToTerminatePID setObject: [[activeSet objectAtIndex: i] objectForKey: @"pid"] 
-										forKey: [[activeSet objectAtIndex: i] objectForKey: @"name"]];
+			processesToTerminatePID[activeSet[i][@"name"]] = activeSet[i][@"pid"];
 		}
 	}
 	
@@ -311,16 +324,16 @@
 		return;
 	
 	// Get signal to send to process based on prefs
-    int sigValue = [[NSUserDefaults standardUserDefaults] boolForKey: @"sigKill"] ? SIGKILL : SIGTERM;
+    int sigValue = [NSUserDefaults.standardUserDefaults boolForKey: @"sigKill"] ? SIGKILL : SIGTERM;
 	
 	// iterate through list of PIDs, send each of them the kill/term signal
 	for (i = 0; i < [processesToTerminatePID count]; i++)
 	{
-		int pid = [[[processesToTerminatePID allValues] objectAtIndex: i] intValue];
+		int pid = [[processesToTerminatePID allValues][i] intValue];
 		int ret = kill(pid, sigValue);
 		if (ret)
 		{
-			[STUtil alert: [NSString stringWithFormat: @"Failed to kill process %@", [[processesToTerminateNamed allValues] objectAtIndex: i]]
+			[STUtil alert: [NSString stringWithFormat: @"Failed to kill process %@", [processesToTerminateNamed allValues][i]]
 				  subText: @"The process may be owned by another user.  Relaunch Sloth as root to kill it."];
 			return;
 		}
@@ -347,8 +360,7 @@
 	{
 		if ([selectedRows containsIndex: i])
 		{
-			[filesToReveal setObject: [[activeSet objectAtIndex: i] objectForKey: @"fullPath"] 
-							  forKey: [[activeSet objectAtIndex: i] objectForKey: @"fullPath"]];
+			filesToReveal[activeSet[i][@"fullPath"]] = activeSet[i][@"fullPath"];
 		}
 	}
 	
@@ -356,7 +368,7 @@
 	if ([filesToReveal count] > 3)
 	{
 		if (![STUtil proceedWarning: @"Are you sure you want to reveal the selected files?" 
-							subText: [NSString stringWithFormat: @"This will reveal %d files in the Finder", [filesToReveal count]] 
+							subText: [NSString stringWithFormat: @"This will reveal %ld files in the Finder", (unsigned long)[filesToReveal count]]
 						 actionText: @"Reveal"])
 			return;
 	}
@@ -364,7 +376,7 @@
 	// iterate through files and reveal them using NSWorkspace
 	for (i = 0; i < [filesToReveal count]; i++)
 	{	
-		NSString *path = [[filesToReveal allKeys] objectAtIndex: i];
+		NSString *path = [filesToReveal allKeys][i];
 		if ([[NSFileManager defaultManager] fileExistsAtPath: path isDirectory: &isDir]) 
 		{
 			if (isDir)
@@ -389,7 +401,7 @@
 	
 	//initialize task -- we launc the AppleScript via the 'osascript' CLI program
 	[theTask setLaunchPath: @"/usr/bin/osascript"];
-	[theTask setArguments: [NSArray arrayWithObjects: @"-e", osaCmd, nil]];
+	[theTask setArguments: @[@"-e", osaCmd]];
 	
 	//launch, wait until it's done and then release it
 	[theTask launch];
@@ -399,6 +411,134 @@
 	[[NSApplication sharedApplication] terminate: self];
 }
 
+
+
+#pragma mark -
+
+//////////// delegate and data source methods for the NSTableView /////////////
+
+
+- (NSInteger)outlineView:(NSOutlineView *)outlineView numberOfChildrenOfItem:(id)item
+{
+		return item == nil ? activeDictionary.count :
+		[item isKindOfClass:NSDictionary.class] ? 1 : [item count];
+}
+
+
+- (id)outlineView:(NSOutlineView *)outlineView child:(NSInteger)index ofItem:(id)item
+{
+	item = item ?: activeDictionary;
+
+    if ([item isKindOfClass:NSArray.class]) {
+        return item[index];
+    }
+    else if ([item isKindOfClass:NSDictionary.class]) {
+        return item[[item allKeys][index]];
+    }
+    return nil;
+}
+
+
+
+- (id)outlineView:(NSOutlineView *)outline objectValueForTableColumn:(NSTableColumn *)column byItem:(id)item
+{
+	if ([item isKindOfClass:[NSString class]]) {
+		return item;
+	} else if ([item isKindOfClass:[NSArray class]]) {
+		NSArray *keys = [activeDictionary allKeysForObject:item];
+		return [column.identifier caseInsensitiveCompare: @"1"] == NSOrderedSame ?
+		item[0] : ///keys[0] :
+		[column.identifier caseInsensitiveCompare: @"2"] == NSOrderedSame ?
+			[NSString stringWithFormat:@"Instances: %@", activeInstances[item[0][@"name"]]] : nil;
+//		[@"pid"] :
+
+nil;
+	}
+	else if ([item isKindOfClass:NSDictionary.class])
+		return [column.identifier caseInsensitiveCompare: @"1"] == NSOrderedSame ?
+			item[@"name"] :
+			[column.identifier caseInsensitiveCompare: @"2"] == NSOrderedSame ?
+			item[@"pid"] :
+			[column.identifier caseInsensitiveCompare: @"3"] == NSOrderedSame ?
+			item[@"type"] :
+			[column.identifier caseInsensitiveCompare: @"4"] == NSOrderedSame ?
+			^{
+//				if ([NSUserDefaults.standardUserDefaults boolForKey: @"showEntireFilePathEnabled"])
+					return item[@"fullPath"];
+//				else
+//					return item[@"path"];
+			}() : nil;
+			
+
+    return nil;
+}
+
+
+- (BOOL)outlineView:(NSOutlineView *)outlineView isItemExpandable:(id)item {
+	if ([item isKindOfClass:[NSArray class]] || [item isKindOfClass:[NSDictionary class]]) {
+        if ([item count] > 0) {
+            return YES;
+		}
+    }
+
+    return NO;
+}
+
+/*
+
+- (NSInteger)outlineView:(NSOutlineView *)outlineView numberOfChildrenOfItem:(id)item {
+
+    return (item == nil) ? activeDictionary.allKeys.count : [activeDictionary[item]count];
+}
+
+
+- (BOOL)outlineView:(NSOutlineView *)outlineView isItemExpandable:(id)item {
+    if (item == nil) return YES;
+	else if ( [activeDictionary.allKeys containsObject:item] )
+		return [activeDictionary[item]count];
+	else return -1;
+}
+
+
+- (id)outlineView:(NSOutlineView *)outlineView child:(NSInteger)index ofItem:(id)item {
+
+    return (item == nil) ? activeDictionary[item][item][index][@"name"] : @"child";
+
+	//[FileSystemItem rootItem] : [(FileSystemItem *)item childAtIndex:index];
+}
+
+
+- (id)outlineView:(NSOutlineView *)outlineView objectValueForTableColumn:(NSTableColumn *)tableColumn byItem:(id)item
+{
+
+	return activeDictionary[item][1];
+//	return (item == nil) ? @"/" : [activeDictionary.] relativePath];
+//
+//	}	NSArray* group = activeDictionary[item]indexOfObject:item]
+//	if ([[tableColumn identifier] caseInsensitiveCompare: @"1"] == NSOrderedSame)
+//	{
+//		return(] [rowIndex][@"name"]);
+//	}
+//	else if ([[tableColumn identifier] caseInsensitiveCompare: @"2"] == NSOrderedSame)
+//	{
+//		return([activeSet[rowIndex][@"pid"] stringValue]);
+//	}
+//	else if ([[tableColumn identifier] caseInsensitiveCompare: @"3"] == NSOrderedSame)
+//	{
+//		return(activeSet[rowIndex][@"type"]);
+//	}
+//	else if ([[tableColumn identifier] caseInsensitiveCompare: @"4"] == NSOrderedSame)
+//	{
+//		if ([NSUserDefaults.standardUserDefaults boolForKey: @"showEntireFilePathEnabled"])
+//			return(activeSet[rowIndex][@"fullPath"]);
+//		else
+//			return(activeSet[rowIndex][@"path"]);
+//	}
+
+//	return  [self tableView:outlineView objectValueForTableColumn:tableColumn row:]
+//
+}
+*/
 #pragma mark -
 
 //////////// delegate and data source methods for the NSTableView /////////////
@@ -412,22 +552,22 @@
 {
 	if ([[aTableColumn identifier] caseInsensitiveCompare: @"1"] == NSOrderedSame)
 	{
-		return([[activeSet objectAtIndex: rowIndex] objectForKey: @"name"]);
+		return(activeSet[rowIndex][@"name"]);
 	}
 	else if ([[aTableColumn identifier] caseInsensitiveCompare: @"2"] == NSOrderedSame)
 	{
-		return([[[activeSet objectAtIndex: rowIndex] objectForKey: @"pid"] stringValue]);
+		return([activeSet[rowIndex][@"pid"] stringValue]);
 	}
 	else if ([[aTableColumn identifier] caseInsensitiveCompare: @"3"] == NSOrderedSame)
 	{
-		return([[activeSet objectAtIndex: rowIndex] objectForKey: @"type"]);
+		return(activeSet[rowIndex][@"type"]);
 	}
 	else if ([[aTableColumn identifier] caseInsensitiveCompare: @"4"] == NSOrderedSame)
 	{
-		if ([[NSUserDefaults standardUserDefaults] boolForKey: @"showEntireFilePathEnabled"])
-			return([[activeSet objectAtIndex: rowIndex] objectForKey: @"fullPath"]);
+		if ([NSUserDefaults.standardUserDefaults boolForKey: @"showEntireFilePathEnabled"])
+			return(activeSet[rowIndex][@"fullPath"]);
 		else
-			return([[activeSet objectAtIndex: rowIndex] objectForKey: @"path"]);
+			return(activeSet[rowIndex][@"path"]);
 	}
 	/*else if ([[aTableColumn identifier] caseInsensitiveCompare: @"5"] == NSOrderedSame)
 	 {
@@ -463,8 +603,8 @@
 {
 	if ([tableView selectedRow] >= 0 && [tableView selectedRow] < [activeSet count])
 	{
-		NSMutableDictionary *item = [activeSet objectAtIndex: [tableView selectedRow]];
-		BOOL canReveal = [[item objectForKey: @"canReveal"] boolValue];
+		NSMutableDictionary *item = activeSet[[tableView selectedRow]];
+		BOOL canReveal = [item[@"canReveal"] boolValue];
 		[revealButton setEnabled: canReveal];
 		[killButton setEnabled: YES];
 	}
@@ -487,21 +627,21 @@
 		{
 			NSString *filePath;
 			
-			if ([[NSUserDefaults standardUserDefaults] boolForKey: @"showEntireFilePathEnabled"])
-				filePath = [[activeSet objectAtIndex: i] objectForKey: @"fullPath"];
+			if ([NSUserDefaults.standardUserDefaults boolForKey: @"showEntireFilePathEnabled"])
+				filePath = activeSet[i][@"fullPath"];
 			else
-				filePath = [[activeSet objectAtIndex: i] objectForKey: @"path"];
+				filePath = activeSet[i][@"path"];
 			
 			NSString *rowString = [NSString stringWithFormat: @"%@\t%@\t%@\t%@\n",
-								   [[activeSet objectAtIndex: i] objectForKey: @"name"],
-								   [[[activeSet objectAtIndex: i] objectForKey: @"pid"] stringValue],
-								   [[activeSet objectAtIndex: i] objectForKey: @"type"],
+								   activeSet[i][@"name"],
+								   [activeSet[i][@"pid"] stringValue],
+								   activeSet[i][@"type"],
 								   filePath];
 			dragString = [dragString stringByAppendingString: rowString];
 		}
 	}
 	
-	[pboard declareTypes:[NSArray arrayWithObjects:NSStringPboardType, nil] owner: self];
+	[pboard declareTypes:@[NSStringPboardType] owner: self];
 	[pboard setString: dragString forType:NSStringPboardType];
 	return YES;	
 }
@@ -513,7 +653,7 @@
 	// two possible senders for this notification:  either lsofPathTextField or the resultFilter
 	if ([aNotification object] == lsofPathTextField)
 	{
-		[[NSUserDefaults standardUserDefaults] setObject: [lsofPathTextField stringValue]  forKey:@"lsofPath"];
+		[NSUserDefaults.standardUserDefaults setObject: [lsofPathTextField stringValue]  forKey:@"lsofPath"];
 	}
 	else
 	{
@@ -579,7 +719,7 @@
 	NSData			*data;
     
 	//get lsof path from prefs
-	NSString *launchPath = [[NSUserDefaults standardUserDefaults] stringForKey:@"lsofPath"];
+	NSString *launchPath = [NSUserDefaults.standardUserDefaults stringForKey:@"lsofPath"];
 	
 	//make sure it exists
 	if (![[NSFileManager defaultManager] fileExistsAtPath: launchPath isDirectory: &isDir] || isDir)
@@ -591,7 +731,7 @@
 	//run lsof -v to get version info
 	task = [[NSTask alloc] init];
 	[task setLaunchPath: launchPath];
-	[task setArguments: [NSArray arrayWithObjects: @"-v", nil]];
+	[task setArguments: @[@"-v"]];
 	[task setStandardOutput: pipe];
 	[task setStandardError: pipe];
 	[task launch];

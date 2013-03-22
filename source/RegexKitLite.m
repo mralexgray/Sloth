@@ -857,7 +857,7 @@ static id rkl_performRegexOp(id self, SEL _cmd, RKLRegexOp regexOp, NSString *re
       findAll = rkl_makeFindAll(stackRanges, *matchRange, 2048L, (2048UL * sizeof(NSRange)), 0UL, (void **)&scratchBuffer[0], &scratchBuffer[1], &scratchBuffer[2], 0L, capture, ((maskedRegexOp == RKLCapturesArrayOp) ? 1L : NSIntegerMax));
       
       if(RKL_EXPECTED(rkl_findRanges(cacheSlot, regexOp, &findAll, &exception, &status) == NO, 1L)) {
-        if(RKL_EXPECTED(findAll.found == 0L, 0L)) { resultObject = [NSArray array]; } else { resultObject = rkl_makeArray(cacheSlot, regexOp, &findAll, &exception); }
+        if(RKL_EXPECTED(findAll.found == 0L, 0L)) { resultObject = @[]; } else { resultObject = rkl_makeArray(cacheSlot, regexOp, &findAll, &exception); }
       }
       
       if(RKL_EXPECTED(scratchBuffer[0] != NULL, 0L)) { scratchBuffer[0] = rkl_free(&scratchBuffer[0]); }
@@ -889,9 +889,9 @@ static void rkl_handleDelayedAssert(id self, SEL _cmd, id exception) {
   if(RKL_EXPECTED(exception != NULL, 0L)) {
     if([exception isKindOfClass:[NSException class]]) { [[NSException exceptionWithName:[exception name] reason:rkl_stringFromClassAndMethod(self, _cmd, [exception reason]) userInfo:[exception userInfo]] raise]; }
     else {
-      id functionString = [exception objectForKey:@"function"], fileString = [exception objectForKey:@"file"], descriptionString = [exception objectForKey:@"description"], lineNumber = [exception objectForKey:@"line"];
+      id functionString = exception[@"function"], fileString = exception[@"file"], descriptionString = exception[@"description"], lineNumber = exception[@"line"];
       NSCParameterAssert((functionString != NULL) && (fileString != NULL) && (descriptionString != NULL) && (lineNumber != NULL));
-      [[NSAssertionHandler currentHandler] handleFailureInFunction:functionString file:fileString lineNumber:(NSInteger)[lineNumber longValue] description:descriptionString];
+      [[NSAssertionHandler currentHandler] handleFailureInFunction:functionString file:fileString lineNumber:(NSInteger)[lineNumber longValue] description:descriptionString,nil];
     }
   }
 }
@@ -1283,19 +1283,19 @@ static NSDictionary *rkl_userInfoDictionary(NSString *regexString, RKLRegexOptio
   id objects[64], keys[64];
   NSUInteger count = 0UL;
   
-  NSString *errorNameString = [NSString stringWithUTF8String:RKL_ICU_FUNCTION_APPEND(u_errorName)(status)];
+  NSString *errorNameString = @(RKL_ICU_FUNCTION_APPEND(u_errorName)(status));
   
   addKeyAndObject(objects, keys, count, RKLICURegexRegexErrorKey,        regexString);
-  addKeyAndObject(objects, keys, count, RKLICURegexRegexOptionsErrorKey, [NSNumber numberWithUnsignedInt:options]);
-  addKeyAndObject(objects, keys, count, RKLICURegexErrorCodeErrorKey,    [NSNumber numberWithInt:status]);
+  addKeyAndObject(objects, keys, count, RKLICURegexRegexOptionsErrorKey, @(options));
+  addKeyAndObject(objects, keys, count, RKLICURegexErrorCodeErrorKey,    @(status));
   addKeyAndObject(objects, keys, count, RKLICURegexErrorNameErrorKey,    errorNameString);
   
   if((parseError != NULL) && (parseError->line != -1)) {
     NSString *preContextString  = [NSString stringWithCharacters:&parseError->preContext[0]  length:(NSUInteger)RKL_ICU_FUNCTION_APPEND(u_strlen)(&parseError->preContext[0])];
     NSString *postContextString = [NSString stringWithCharacters:&parseError->postContext[0] length:(NSUInteger)RKL_ICU_FUNCTION_APPEND(u_strlen)(&parseError->postContext[0])];
     
-    addKeyAndObject(objects, keys, count, RKLICURegexLineErrorKey,        [NSNumber numberWithInt:parseError->line]);
-    addKeyAndObject(objects, keys, count, RKLICURegexOffsetErrorKey,      [NSNumber numberWithInt:parseError->offset]);
+    addKeyAndObject(objects, keys, count, RKLICURegexLineErrorKey,        @(parseError->line));
+    addKeyAndObject(objects, keys, count, RKLICURegexOffsetErrorKey,      @(parseError->offset));
     addKeyAndObject(objects, keys, count, RKLICURegexPreContextErrorKey,  preContextString);
     addKeyAndObject(objects, keys, count, RKLICURegexPostContextErrorKey, postContextString);
     addKeyAndObject(objects, keys, count, @"NSLocalizedFailureReason",    ([NSString stringWithFormat:@"The error %@ occurred at line %d, column %d: %@<<HERE>>%@", errorNameString, parseError->line, parseError->offset, preContextString, postContextString]));
@@ -1322,8 +1322,8 @@ static NSDictionary *rkl_makeAssertDictionary(const char *function, const char *
   va_start(varArgsList, format);
   NSString *formatString   = [[[NSString alloc] initWithFormat:format arguments:varArgsList] autorelease];
   va_end(varArgsList);
-  NSString *functionString = [NSString stringWithUTF8String:function], *fileString = [NSString stringWithUTF8String:file];
-  return([NSDictionary dictionaryWithObjectsAndKeys:formatString, @"description", functionString, @"function", fileString, @"file", [NSNumber numberWithInt:line], @"line", NSInternalInconsistencyException, @"exceptionName", NULL]);
+  NSString *functionString = @(function), *fileString = @(file);
+  return(@{@"description": formatString, @"function": functionString, @"file": fileString, @"line": @(line), @"exceptionName": NSInternalInconsistencyException});
 }
 
 static NSString *rkl_stringFromClassAndMethod(id object, SEL selector, NSString *format, ...) {

@@ -106,7 +106,7 @@
 	// construct an array of c strings from NSArray w. arguments
 	for (i = 0; i < argumentsCount; i++) 
 	{
-		NSString *theString = [arguments objectAtIndex:i];
+		NSString *theString = arguments[i];
 		unsigned int stringLength = [theString length];
 		
 		args[i] = malloc((stringLength + 1) * sizeof(char));

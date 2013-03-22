@@ -69,9 +69,11 @@
 	
 	//array sets	
 	NSMutableArray		*fileArray;
-	NSMutableArray		*activeSet;
 	NSMutableArray		*subset;
 }
+@property (nonatomic, retain) NSMutableArray		*activeSet;
+@property (nonatomic, retain) NSMutableDictionary	*activeDictionary;
+@property (nonatomic, retain) NSMutableDictionary	*activeInstances;
 
 - (IBAction)reveal:(id)sender;
 - (IBAction)refresh:(id)sender;

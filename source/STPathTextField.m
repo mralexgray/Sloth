@@ -81,7 +81,7 @@
 
 - (void)awakeFromNib
 {
-	[self registerForDraggedTypes: [NSArray arrayWithObjects: NSFilenamesPboardType, nil]];
+	[self registerForDraggedTypes: @[NSFilenamesPboardType]];
 	autocompleteStyle = STShellAutocomplete;
 	colorInvalidPath = YES;
 	foldersAreValid = NO;
@@ -123,7 +123,7 @@
 	{
         NSArray *files = [pboard propertyListForType:NSFilenamesPboardType];
 		
-		[self setStringValue: [files objectAtIndex: 0]];
+		[self setStringValue: files[0]];
     }
     return YES;
 }
