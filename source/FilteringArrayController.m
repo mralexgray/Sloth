@@ -26,10 +26,7 @@
 @implementation FilteringArrayController
 - (void)dealloc
 {
-	if (searchString != NULL)
-		[searchString release]; 
 	searchString = NULL;
-    [super dealloc];
 }
 
 - (NSArray *)arrangeObjects:(NSArray *)objects
@@ -44,7 +41,7 @@
     id item;	
     while (item = [oEnum nextObject]) 
 	{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        @autoreleasepool {
 		
         NSString *lowerName = [[item valueForKeyPath:@"name"] lowercaseString];
         if ([lowerName rangeOfString:lowerSearch].location != NSNotFound)
@@ -74,7 +71,7 @@
 				continue;
 		}
 				
-        [pool release];
+        }
     }
     return [super arrangeObjects:matchedObjects];
 }

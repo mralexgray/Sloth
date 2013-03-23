@@ -19,6 +19,7 @@
  */
 
 #import "SlothController.h"
+#import <Foundation/NSObject.h>
 #import "NSBag.h"
 
 @implementation SlothController
@@ -57,16 +58,6 @@
 	[slothWindow makeKeyAndOrderFront: self];
 }
 
-- (void)dealloc
-{
-	if (fileArray != NULL)
-		[fileArray release];
-	
-	if (subset != NULL)
-		[subset release];
-	
-	[super dealloc];
-}
 
 #pragma mark -
 
@@ -77,12 +68,8 @@
 
 - (IBAction)refresh:(id)sender
 {
-	NSArray		*lines;
-	NSData		*data;
-	NSString	*pid, *process, *ftype, *fname, *output = nil;
-	NSPipe 		*pipe 	= NSPipe.pipe;
+	
 	BOOL 		isDir	= FALSE;
-	int	i;
 
 	//first, make sure that we have a decent lsof
 	NSString *launchPath = [NSUserDefaults.standardUserDefaults stringForKey:@"lsofPath"];
@@ -99,104 +86,126 @@
 	[progressBar setUsesThreadedAnimation: TRUE];
 	[progressBar startAnimation: self];
 	
-	NSBlockOperation* theOp = [NSBlockOperation blockOperationWithBlock: ^{
-		NSLog(@"Beginning operation.\n");
-		// Do some work.
+	NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+	NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
+
+		NSArray		*lines;
+		NSData		*data;
+		NSString	*pid, *process, *ftype, *fname, *output = nil;
+		NSPipe 		*pipe 	= NSPipe.pipe;
+		int	i;
+
+		// our command is:			lsof -F pcnt +c0
+		//
+		// OK, initialise task, run it, retrieve output
+		{
+			NSTask *lsof = [[NSTask alloc] init];
+			[lsof setLaunchPath: launchPath];
+			[lsof setArguments: @[@"-F", @"pcnt", @"+c0"]];
+			[lsof setStandardOutput: pipe];
+			[lsof launch];
+			
+			data = [[pipe fileHandleForReading] readDataToEndOfFile];
+			
+		}
+		
+		//get data output and format as an array of lines of text	
+		output = [[NSString alloc] initWithData: data encoding: NSASCIIStringEncoding];
+		lines = [output componentsSeparatedByString:@"\n"];
+		
+		// parse each line
+		for (i = 0; i < [lines count]-1; i++)
+		{
+			NSString *line = lines[i];
+			
+			//read first character in line
+			if ([line characterAtIndex: 0] == 'p')
+			{
+				pid = [line substringFromIndex: 1];
+			}
+			else if ([line characterAtIndex: 0] == 'c')
+			{
+				process = [line substringFromIndex: 1];
+			}
+			else if ([line characterAtIndex: 0] == 't')
+			{
+				ftype = [line substringFromIndex: 1];
+			}
+			else if ([line characterAtIndex: 0] == 'n')
+			{
+				//we don't report Sloth or lsof info
+				if ([process caseInsensitiveCompare: PROGRAM_NAME] == NSOrderedSame || [process caseInsensitiveCompare: PROGRAM_LSOF_NAME] == NSOrderedSame)
+					continue;
+				
+				//check if we use full path
+				NSString *rawPath = [line substringFromIndex: 1];            
+				BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath: rawPath];
+				NSNumber *canReveal = @(fileExists);
+				NSString *fullPath = rawPath;
+				
+				if (fileExists)
+					fname = [rawPath lastPathComponent];
+				else
+					fname = rawPath;
+				
+				//order matters, see below
+				NSMutableDictionary *fileInfo = [NSMutableDictionary dictionary];
+				
+				fileInfo[@"name"] = process;
+				fileInfo[@"pid"] = @([pid intValue]);
+				fileInfo[@"path"] = fname;
+				fileInfo[@"fullPath"] = fullPath;
+				fileInfo[@"canReveal"] = canReveal;
+				
+				//insert the desired elements
+				if ([ftype caseInsensitiveCompare: @"VREG"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"REG"] == NSOrderedSame) 
+				{
+					fileInfo[@"type"] = @"File";
+				} 
+				else if ([ftype caseInsensitiveCompare: @"VDIR"] == NSOrderedSame  || [ftype caseInsensitiveCompare: @"DIR"] == NSOrderedSame) 
+				{
+					fileInfo[@"type"] = @"Directory";
+				} 
+				else if ([ftype caseInsensitiveCompare: @"IPv6"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"IPv4"] == NSOrderedSame) 
+				{
+					fileInfo[@"type"] = @"IP Socket";
+				} 
+				else  if ([ftype caseInsensitiveCompare: @"unix"] == NSOrderedSame) 
+				{
+					fileInfo[@"type"] = @"Unix Socket";
+				} 
+				else if ([ftype caseInsensitiveCompare: @"VCHR"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"CHR"] == NSOrderedSame) 
+				{
+					fileInfo[@"type"] = @"Char Device";
+				}
+				else
+				{
+					continue;
+				}
+				[fileArray addObject: fileInfo];
+			}
+		}
 	}];
 
+//	//you can add more blocks
+//	[operation addExecutionBlock:^{
+//		NSLog(@"Another block");
+//	}];
 
-	// our command is:			lsof -F pcnt +c0
-	//
-	// OK, initialise task, run it, retrieve output
-	{
-		NSTask *lsof = [[NSTask alloc] init];
-		[lsof setLaunchPath: launchPath];
-		[lsof setArguments: @[@"-F", @"pcnt", @"+c0"]];
-		[lsof setStandardOutput: pipe];
-		[lsof launch];
-		
-		data = [[pipe fileHandleForReading] readDataToEndOfFile];
-		
-		[lsof release];
-	}
-	
-	//get data output and format as an array of lines of text	
-	output = [[NSString alloc] initWithData: data encoding: NSASCIIStringEncoding];
-	lines = [output componentsSeparatedByString:@"\n"];
-	
-	// parse each line
-	for (i = 0; i < [lines count]-1; i++)
-	{
-		NSString *line = lines[i];
-		
-		//read first character in line
-		if ([line characterAtIndex: 0] == 'p')
-		{
-			pid = [line substringFromIndex: 1];
-		}
-		else if ([line characterAtIndex: 0] == 'c')
-		{
-			process = [line substringFromIndex: 1];
-		}
-		else if ([line characterAtIndex: 0] == 't')
-		{
-			ftype = [line substringFromIndex: 1];
-		}
-		else if ([line characterAtIndex: 0] == 'n')
-		{
-			//we don't report Sloth or lsof info
-			if ([process caseInsensitiveCompare: PROGRAM_NAME] == NSOrderedSame || [process caseInsensitiveCompare: PROGRAM_LSOF_NAME] == NSOrderedSame)
-				continue;
-			
-			//check if we use full path
-            NSString *rawPath = [line substringFromIndex: 1];            
-            BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath: rawPath];
-            NSNumber *canReveal = @(fileExists);
-            NSString *fullPath = rawPath;
-            
-			if (fileExists)
-                fname = [rawPath lastPathComponent];
-            else
-                fname = rawPath;
-			
-            //order matters, see below
-            NSMutableDictionary *fileInfo = [NSMutableDictionary dictionary];
-			
-            fileInfo[@"name"] = process;
-            fileInfo[@"pid"] = @([pid intValue]);
-            fileInfo[@"path"] = fname;
-            fileInfo[@"fullPath"] = fullPath;
-            fileInfo[@"canReveal"] = canReveal;
-			
-			//insert the desired elements
-			if ([ftype caseInsensitiveCompare: @"VREG"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"REG"] == NSOrderedSame) 
-			{
-				fileInfo[@"type"] = @"File";
-			} 
-			else if ([ftype caseInsensitiveCompare: @"VDIR"] == NSOrderedSame  || [ftype caseInsensitiveCompare: @"DIR"] == NSOrderedSame) 
-			{
-				fileInfo[@"type"] = @"Directory";
-            } 
-			else if ([ftype caseInsensitiveCompare: @"IPv6"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"IPv4"] == NSOrderedSame) 
-			{
-                fileInfo[@"type"] = @"IP Socket";
-            } 
-			else  if ([ftype caseInsensitiveCompare: @"unix"] == NSOrderedSame) 
-			{
-                fileInfo[@"type"] = @"Unix Socket";
-            } 
-			else if ([ftype caseInsensitiveCompare: @"VCHR"] == NSOrderedSame || [ftype caseInsensitiveCompare: @"CHR"] == NSOrderedSame) 
-			{
-                fileInfo[@"type"] = @"Char Device";
-            }
-			else
-			{
-				continue;
-            }
-            [fileArray addObject: fileInfo];
-		}
-	}
-	
+	[operation setCompletionBlock:^{
+		NSLog(@"Doing something once the operation has finished...");
+		activeSet = fileArray;
+		[self filterResults];
+
+		// update last run time
+		[lastRunTextField setStringValue: [NSString stringWithFormat: @"Output at %@ ", [NSDate date]]];
+
+		// stop progress bar and reload data
+		[tableView reloadData];
+		[progressBar stopAnimation: self];
+	}];
+
+	[queue addOperation:operation];
 }
 
 - (void) setActiveSet:(NSMutableArray *)aS {
@@ -211,7 +220,7 @@
 								 forKey:group];
 	}];
 	[activeDictionary.allKeys enumerateObjectsUsingBlock:^(NSString* name, NSUInteger idx, BOOL *stop) {
-		__block NSBag *bag = NSBag.new;
+		__weak NSBag *bag = NSBag.new;
 		[activeDictionary[name] enumerateObjectsUsingBlock:^(NSDictionary *d, NSUInteger idx, BOOL *stop) {
 			[bag add:d[@"pid"]];
 		}];
@@ -228,8 +237,6 @@
 	NSEnumerator *e = [fileArray objectEnumerator];
 	id object;
 	
-	if (subset != NULL)
-		[subset release];
 
 	subset = [[NSMutableArray alloc] init];
 	
@@ -269,7 +276,6 @@
 			[subset addObject:object];
 	}
 	
-	[regex release];
 	
 	self.activeSet = subset;
 	
@@ -406,7 +412,6 @@
 	//launch, wait until it's done and then release it
 	[theTask launch];
 	[theTask waitUntilExit];
-	[theTask release];
 	
 	[[NSApplication sharedApplication] terminate: self];
 }
@@ -739,9 +744,8 @@ nil;
 	//read the output from the command
 	data = [[pipe fileHandleForReading] readDataToEndOfFile];
 	
-	[task release];
     
-    return [[[NSString alloc] initWithData: data encoding: NSASCIIStringEncoding] autorelease];
+    return [[NSString alloc] initWithData: data encoding: NSASCIIStringEncoding];
 }
 
 - (IBAction)showLsofVersionInfo:(id)sender

@@ -35,7 +35,6 @@
 	
 	if ([alert runModal] == NSAlertFirstButtonReturn) 
 	{
-		[alert release];
 	} 
 }
 
@@ -49,7 +48,6 @@
 	
 	if ([alert runModal] == NSAlertFirstButtonReturn) 
 	{
-		[alert release];
 		ExitToShell();
 	} 
 }
@@ -66,11 +64,9 @@
 	
 	if ([alert runModal] == NSAlertFirstButtonReturn) 
 	{
-		[alert release];
 		return YES;
 	}
 	
-	[alert release];
 	return NO;
 }
 

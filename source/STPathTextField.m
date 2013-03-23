@@ -253,7 +253,7 @@
 {
 	if (colorInvalidPath)
 		[self updateTextColoring];
-	[[self delegate] controlTextDidChange: [NSNotification notificationWithName: NSControlTextDidChangeNotification object: self]];
+	[(NSControl*)[self delegate] controlTextDidChange: [NSNotification notificationWithName: NSControlTextDidChangeNotification object: self]];
 } 
 
 

@@ -14,7 +14,7 @@
 		F426781C161B52AC00B736B6 /* CHANGES.txt in Resources */ = {isa = PBXBuildFile; fileRef = F426781B161B52AC00B736B6 /* CHANGES.txt */; };
 		F438711713402C8200B51A5E /* FilteringArrayController.m in Sources */ = {isa = PBXBuildFile; fileRef = F438710813402C8200B51A5E /* FilteringArrayController.m */; };
 		F438711813402C8200B51A5E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = F438710913402C8200B51A5E /* main.m */; };
-		F438711913402C8200B51A5E /* RegexKitLite.m in Sources */ = {isa = PBXBuildFile; fileRef = F438710B13402C8200B51A5E /* RegexKitLite.m */; };
+		F438711913402C8200B51A5E /* RegexKitLite.m in Sources */ = {isa = PBXBuildFile; fileRef = F438710B13402C8200B51A5E /* RegexKitLite.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		F438711A13402C8200B51A5E /* SlothController.m in Sources */ = {isa = PBXBuildFile; fileRef = F438710E13402C8200B51A5E /* SlothController.m */; };
 		F438711C13402C8200B51A5E /* STPathTextField.m in Sources */ = {isa = PBXBuildFile; fileRef = F438711213402C8200B51A5E /* STPathTextField.m */; };
 		F438711D13402C8200B51A5E /* STPrivilegedTask.m in Sources */ = {isa = PBXBuildFile; fileRef = F438711413402C8200B51A5E /* STPrivilegedTask.m */; };
@@ -33,7 +33,6 @@
 /* Begin PBXFileReference section */
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
-		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
 		7B32406616FCE8CF00108701 /* SlothDarkView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.objj.h; path = SlothDarkView.h; sourceTree = "<group>"; };
 		7B32406716FCE8CF00108701 /* SlothDarkView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SlothDarkView.m; sourceTree = "<group>"; };
 		7B32406A16FD0F7700108701 /* NSBag.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.objj.h; path = NSBag.h; sourceTree = "<group>"; };
@@ -93,7 +92,6 @@
 		29B97314FDCFA39411CA2CEA /* Sloth */ = {
 			isa = PBXGroup;
 			children = (
-				7B32406D16FD172400108701 /* Foundation.framework */,
 				F438710613402C8200B51A5E /* source */,
 				F438712713402CDD00B51A5E /* resources */,
 				29B97323FDCFA39411CA2CEA /* Frameworks */,
@@ -105,8 +103,8 @@
 		29B97323FDCFA39411CA2CEA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				7B32406D16FD172400108701 /* Foundation.framework */,
 				29B97324FDCFA39411CA2CEA /* AppKit.framework */,
-				29B97325FDCFA39411CA2CEA /* Foundation.framework */,
 				1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */,
 				F438714313402D3A00B51A5E /* Security.framework */,
 				F47350BA0FCDB8960086CF02 /* libicucore.dylib */,
@@ -245,15 +243,12 @@
 		C01FCF4B08A954540054247B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ADDITIONAL_SDKS = "";
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
-				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				IBC_STRIP_NIBS = YES;
 				INFOPLIST_FILE = resources/Info.plist;
-				INSTALL_PATH = "$(HOME)/Applications";
-				MACOSX_DEPLOYMENT_TARGET = 10.6.8;
 				PRODUCT_NAME = Sloth;
 				SDKROOT = macosx;
 				WRAPPER_EXTENSION = app;
@@ -263,13 +258,11 @@
 		C01FCF4C08A954540054247B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ADDITIONAL_SDKS = "";
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
-				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
-				IBC_STRIP_NIBS = YES;
 				INFOPLIST_FILE = resources/Info.plist;
-				INSTALL_PATH = "$(HOME)/Applications";
-				MACOSX_DEPLOYMENT_TARGET = 10.6.8;
 				PRODUCT_NAME = Sloth;
 				SDKROOT = macosx;
 				WRAPPER_EXTENSION = app;
@@ -279,37 +272,20 @@
 		C01FCF4F08A954540054247B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
-				DEPLOYMENT_POSTPROCESSING = NO;
-				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = YES;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_VERSION = "";
-				GCC_WARN_ABOUT_RETURN_TYPE = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.6;
-				SDKROOT = "";
+				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx10.7;
 			};
 			name = Debug;
 		};
 		C01FCF5008A954540054247B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
-				DEPLOYMENT_POSTPROCESSING = NO;
-				GCC_AUTO_VECTORIZATION = YES;
-				GCC_CW_ASM_SYNTAX = YES;
-				GCC_ENABLE_CPP_EXCEPTIONS = YES;
-				GCC_ENABLE_CPP_RTTI = YES;
-				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
-				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
-				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = YES;
-				GCC_MODEL_TUNING = G4;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_VERSION = "";
-				GCC_WARN_ABOUT_RETURN_TYPE = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.6;
-				SDKROOT = "";
+				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx10.7;
 				VALID_ARCHS = "i386 x86_64";
 			};
 			name = Release;

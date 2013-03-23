@@ -37,23 +37,10 @@
     return self;
 }
 
--(void)dealloc
-{	
-	if (arguments != NULL)
-		[arguments release];
-
-	if (cwd != NULL)
-		[cwd release];
-	
-	if (outputFileHandle != NULL)
-		[outputFileHandle release];
-	
-	[super dealloc];
-}
 
 + (STPrivilegedTask *)launchedPriviledTaskWithLaunchPath:(NSString *)path arguments:(NSArray *)args
 {
-	STPrivilegedTask *task = [[[STPrivilegedTask alloc] initWithLaunchPath: path arguments: args] autorelease];
+	STPrivilegedTask *task = [[STPrivilegedTask alloc] initWithLaunchPath: path arguments: args];
 	[task launch];
 	[task waitUntilExit];
 	return task;
@@ -171,8 +158,6 @@
 
 - (void)setArguments:(NSArray *)args
 {
-		if (arguments != NULL)
-			[arguments release];
 		arguments = [[NSArray alloc] initWithArray: args];
 }
 
